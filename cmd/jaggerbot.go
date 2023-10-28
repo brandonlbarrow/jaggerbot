@@ -33,7 +33,9 @@ func main() {
 	}
 	done := make(chan error)
 	go runDiscordClient(discordClient, done)
+	discordClient.SendAdminMessage("started jagger discord client...")
 	go runCallbackServer(eventChan, done)
+	discordClient.SendAdminMessage("started jagger webserver...")
 	_, err = twitchws.NewClient()
 	if err != nil {
 		discordClient.SendAdminMessage(fmt.Sprintf("jagger ran into an error. OOPSIE WOOPSIE! %s", err.Error()))
@@ -41,6 +43,7 @@ func main() {
 	}
 	for {
 		var event twitchws.Event
+		discordClient.SendAdminMessage("jagger is listening for Twitch events...")
 		select {
 		case runErr := <-done:
 			if runErr != nil {

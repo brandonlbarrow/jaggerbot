@@ -62,8 +62,8 @@ func (c *Client) SendMessage(content string) {
 	}
 }
 
-func (c *Client) SendAdminMessage(err string) {
+func (c *Client) SendAdminMessage(content string) {
 	for _, channelID := range c.adminChannelIDs {
-		c.session.ChannelMessageSend(channelID, err)
+		c.session.ChannelMessageSend(channelID, content)
 	}
 }
