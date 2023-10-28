@@ -23,6 +23,7 @@ func main() {
 		DiscordGuildID:    os.Getenv("DISCORD_GUILD_ID"),
 		DiscordBotToken:   os.Getenv("DISCORD_BOT_TOKEN"),
 		DiscordChannelIDs: strings.Split(os.Getenv("DISCORD_CHANNEL_IDS"), ","),
+		AdminChannelIDs:   strings.Split(os.Getenv("DISCORD_ADMIN_CHANNEL_IDs"), ","),
 		EventChannel:      eventChan,
 	}
 
@@ -35,16 +36,20 @@ func main() {
 	go runCallbackServer(eventChan, done)
 	_, err = twitchws.NewClient()
 	if err != nil {
+		discordClient.SendAdminMessage(fmt.Sprintf("jagger ran into an error. OOPSIE WOOPSIE! %s", err.Error()))
 		log.Fatalf("error creating twitch client, cannot continue: %s", err)
 	}
 	for {
+		var event twitchws.Event
 		select {
 		case runErr := <-done:
 			if runErr != nil {
+				discordClient.SendAdminMessage(fmt.Sprintf("jagger ran into an error. OOPSIE WOOPSIE! %s", runErr.Error()))
 				log.Fatal(runErr)
 			}
-		case event := <-eventChan:
+		case event = <-eventChan:
 			log.Printf("received event: %v\n", event)
+			discordClient.SendAdminMessage(fmt.Sprintf("jagger received an event from Twitch: \n%v", event))
 			discordClient.SendMessage("get in here, Sensai's shitting it up! https://twitch.tv/sensaiopti")
 		}
 	}

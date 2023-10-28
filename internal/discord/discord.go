@@ -10,15 +10,17 @@ import (
 type Config struct {
 	DiscordBotToken   string
 	DiscordChannelIDs []string
+	AdminChannelIDs   []string
 	DiscordGuildID    string
 	EventChannel      chan twitchws.Event
 }
 
 type Client struct {
-	session    *discordgo.Session
-	guildID    string
-	channelIDs []string
-	eventChan  chan twitchws.Event
+	session         *discordgo.Session
+	guildID         string
+	channelIDs      []string
+	adminChannelIDs []string
+	eventChan       chan twitchws.Event
 }
 
 func NewClient(config *Config) (*Client, error) {
@@ -57,5 +59,11 @@ func (c *Client) infoHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 func (c *Client) SendMessage(content string) {
 	for _, channelID := range c.channelIDs {
 		c.session.ChannelMessageSend(channelID, content)
+	}
+}
+
+func (c *Client) SendAdminMessage(err string) {
+	for _, channelID := range c.adminChannelIDs {
+		c.session.ChannelMessageSend(channelID, err)
 	}
 }
