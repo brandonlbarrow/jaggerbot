@@ -29,10 +29,11 @@ func NewClient(config *Config) (*Client, error) {
 		return nil, fmt.Errorf("error creating discord client: %w", err)
 	}
 	return &Client{
-		session:    session,
-		guildID:    config.DiscordGuildID,
-		channelIDs: config.DiscordChannelIDs,
-		eventChan:  config.EventChannel,
+		session:         session,
+		guildID:         config.DiscordGuildID,
+		channelIDs:      config.DiscordChannelIDs,
+		adminChannelIDs: config.AdminChannelIDs,
+		eventChan:       config.EventChannel,
 	}, nil
 }
 
