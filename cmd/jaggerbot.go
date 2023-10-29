@@ -18,6 +18,7 @@ func main() {
 	godotenv.Load()
 
 	eventChan := make(chan twitchws.Event)
+	errorEventChan := make(chan error)
 
 	discordConfig := discord.Config{
 		DiscordGuildID:    os.Getenv("DISCORD_GUILD_ID"),
@@ -34,15 +35,15 @@ func main() {
 	done := make(chan error)
 	go runDiscordClient(discordClient, done)
 	discordClient.SendAdminMessage("started jagger discord client...")
-	go runCallbackServer(eventChan, done)
+	go runCallbackServer(eventChan, errorEventChan, done)
 	discordClient.SendAdminMessage("started jagger webserver...")
-	_, err = twitchws.NewClient()
-	if err != nil {
+	if err = twitchws.SetupTwitch(); err != nil {
 		discordClient.SendAdminMessage(fmt.Sprintf("jagger ran into an error. OOPSIE WOOPSIE! %s", err.Error()))
 		log.Fatalf("error creating twitch client, cannot continue: %s", err)
 	}
 	for {
 		var event twitchws.Event
+		var errEvent error
 		discordClient.SendAdminMessage("jagger is listening for Twitch events...")
 		select {
 		case runErr := <-done:
@@ -54,6 +55,9 @@ func main() {
 			log.Printf("received event: %v\n", event)
 			discordClient.SendAdminMessage(fmt.Sprintf("jagger received an event from Twitch: \n%v", event))
 			discordClient.SendMessage("get in here, Sensai's shitting it up! https://twitch.tv/sensaiopti")
+		case errEvent = <-errorEventChan:
+			log.Printf("webserver encountered error: %s", errEvent)
+			discordClient.SendAdminMessage(fmt.Sprintf("jagger webserver had error handling Twitch event: %s", errEvent.Error()))
 		}
 	}
 
@@ -66,9 +70,9 @@ func runDiscordClient(client *discord.Client, done chan error) error {
 	return nil
 }
 
-func runCallbackServer(eventChan chan twitchws.Event, done chan error) error {
+func runCallbackServer(eventChan chan twitchws.Event, errorEventChan, done chan error) error {
 	server := http.NewServeMux()
-	handler := webserver.Handler{EventChannel: eventChan}
+	handler := webserver.Handler{EventChannel: eventChan, ErrorEventChannel: errorEventChan}
 	server.HandleFunc("/jagger/callback", handler.HandleTwitchCallback)
 	log.Println("listening on :8080 for /jagger/callback")
 	if err := http.ListenAndServe(":8080", server); err != nil {

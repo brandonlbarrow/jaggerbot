@@ -112,23 +112,32 @@ func (c *Client) RunIRCClient() {
 	c.ircClient.Run()
 }
 
-func NewClient() (*Client, error) {
+func SetupTwitch() error {
 
-	authResp, err := getAppToken()
+	authResp, err := authenticateToTwitch()
+	if err != nil {
+		return fmt.Errorf("error getting app token: %w", err)
+	}
+	userId := os.Getenv("TWITCH_SENSAI_USER_ID")
+	_, err = getEventSubscriptions(authResp, true)
+	if err != nil {
+		return fmt.Errorf("error getting twitch subscriptions: %w", err)
+	}
+	if err := subscribeToSensai(authResp, os.Getenv("TWITCH_EVENTSUB_SECRET"), userId); err != nil {
+		return fmt.Errorf("error subscribing to channel broadcast online: %w", err)
+	}
+	return nil
+}
+
+func GetEventSubscriptions() (*GetSubscriptionsResponse, error) {
+	authResp, err := authenticateToTwitch()
 	if err != nil {
 		return nil, fmt.Errorf("error getting app token: %w", err)
 	}
-	userId := os.Getenv("TWITCH_SENSAI_USER_ID")
-	if err := getEventSubscriptions(authResp, false); err != nil {
-		return nil, fmt.Errorf("error getting event subscriptions: %w", err)
-	}
-	if err := subscribeToSensai(authResp, os.Getenv("TWITCH_EVENTSUB_SECRET"), userId); err != nil {
-		return nil, fmt.Errorf("error subscribing to channel broadcast online: %w", err)
-	}
-	return nil, nil
+	return getEventSubscriptions(authResp, false)
 }
 
-func getAppToken() (string, error) {
+func authenticateToTwitch() (string, error) {
 	httpClient := http.DefaultClient
 	authReq := AuthRequest{
 		ClientID:     os.Getenv("TWITCH_CLIENT_ID"),
@@ -192,31 +201,36 @@ func subscribeToSensai(token, secret, channelID string) error {
 	}
 	if strings.Contains(string(bodyBytes), "subscription already exists") {
 		log.Println("subscription already exists, doing nothing")
+	} else {
+		log.Println(string(bodyBytes))
 	}
+
 	return nil
 }
 
-func getEventSubscriptions(token string, flush bool) error {
+func getEventSubscriptions(token string, flush bool) (*GetSubscriptionsResponse, error) {
 	httpClient := http.DefaultClient
 	req, err := http.NewRequest(http.MethodGet, twitchEventSubscriptionsURL, nil)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("getEventSubscriptions: error forming http request: %w", err)
 	}
 	req.Header.Add("Client-Id", os.Getenv("TWITCH_CLIENT_ID"))
 	req.Header.Add("Authorization", fmt.Sprint("Bearer ", token))
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("getEventSubscriptions: error making http request to %s: %w", twitchEventSubscriptionsURL, err)
 	}
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("getEventSubscriptions: error reading response body: %w", err)
 	}
-	fmt.Println(string(bodyBytes))
 	var getSubResp GetSubscriptionsResponse
 	if err := json.Unmarshal(bodyBytes, &getSubResp); err != nil {
-		return err
+		return nil, fmt.Errorf("getEventSubscriptions: error unmarshaling to GetSubscriptionsResponse: %v: %w", string(bodyBytes), err)
+	}
+	for _, i := range getSubResp.Data {
+		log.Println("status", i.Status)
 	}
 	if flush {
 		for _, i := range getSubResp.Data {
@@ -224,7 +238,7 @@ func getEventSubscriptions(token string, flush bool) error {
 		}
 	}
 
-	return nil
+	return &getSubResp, nil
 }
 
 func deleteEventSubscriptions(subscriptionID, token string) error {
