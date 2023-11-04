@@ -68,9 +68,31 @@ func (c *Client) SendMessage(content string) {
 	}
 }
 
+func (c *Client) SendMessageEmbed(message, gameName, streamTitle string) {
+	for _, channelID := range c.channelIDs {
+		c.session.ChannelMessageSendEmbed(channelID, c.gameEmbed(message, gameName, streamTitle))
+	}
+}
+
 func (c *Client) SendAdminMessage(content string) {
 	for _, channelID := range c.adminChannelIDs {
 		c.session.ChannelMessageSend(channelID, content)
+	}
+}
+
+func (c *Client) gameEmbed(message, gameName, streamTitle string) *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
+		Title:       streamTitle,
+		Description: message,
+		URL:         "https://twitch.tv/sensaiopti",
+		Color:       0x33ff33,
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:   "Game",
+				Value:  gameName,
+				Inline: true,
+			},
+		},
 	}
 }
 

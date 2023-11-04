@@ -41,6 +41,11 @@ func main() {
 		discordClient.SendAdminMessage(fmt.Sprintf("jagger ran into an error. OOPSIE WOOPSIE! %s", err.Error()))
 		log.Fatalf("error creating twitch client, cannot continue: %s", err)
 	}
+	if resp, err := twitchws.GetChannelInformation(); err != nil {
+		log.Printf("could not get channel info: %s", err)
+	} else {
+		log.Println(resp)
+	}
 	for {
 		var event twitchws.Event
 		var errEvent error
@@ -54,7 +59,21 @@ func main() {
 		case event = <-eventChan:
 			log.Printf("received event: %v\n", event)
 			discordClient.SendAdminMessage(fmt.Sprintf("jagger received an event from Twitch: \n%v", event))
-			discordClient.SendMessage("get in here, Sensai's shitting it up! https://twitch.tv/sensaiopti")
+			resp, err := twitchws.GetChannelInformation()
+			if err != nil {
+				discordClient.SendAdminMessage(fmt.Sprintf("jagger could not get channel information for stream announcement. Sending a normal message. Error: \n%s", err.Error()))
+				discordClient.SendMessage("get in here, Sensai's shitting it up! https://twitch.tv/sensaiopti")
+			} else if len(resp.Data) != 1 {
+				discordClient.SendAdminMessage(fmt.Sprintf("jagger got game information but the response was not expected: %v", resp.Data))
+			} else {
+				var gameName, streamTitle string
+				for _, d := range resp.Data {
+					gameName = d.GameName
+					streamTitle = d.Title
+				}
+				discordClient.SendMessageEmbed("get in here, Sensai's shitting it up!", gameName, streamTitle)
+			}
+
 		case errEvent = <-errorEventChan:
 			log.Printf("webserver encountered error: %s", errEvent)
 			discordClient.SendAdminMessage(fmt.Sprintf("jagger webserver had error handling Twitch event: %s", errEvent.Error()))

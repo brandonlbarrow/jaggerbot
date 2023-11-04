@@ -19,6 +19,7 @@ const (
 	twitchEventSubscriptionsURL                = "https://api.twitch.tv/helix/eventsub/subscriptions"
 	twitchGetUsersURL                          = "https://api.twitch.tv/helix/users"
 	twitchAuthURL                              = "https://id.twitch.tv/oauth2/token"
+	twitchGetChannelInfoURL                    = "https://api.twitch.tv/helix/channels"
 	twitchEventSubscriptionStreamOnlineType    = "stream.online"
 	twitchEventSubscriptionStreamOnlineVersion = "1"
 )
@@ -81,6 +82,24 @@ type GetSubscriptionsResponse struct {
 	Data  []Subscription `json:"data"`
 }
 
+type GetChannelInformationResponse struct {
+	Data []ChannelInfo `json:"data"`
+}
+
+type ChannelInfo struct {
+	BroadcasterID               string   `json:"broadcaster_id"`
+	BroadcasterLogin            string   `json:"broadcaster_login"`
+	BroadcasterName             string   `json:"broadcaster_name"`
+	BroadcasterLanguage         string   `json:"broadcaster_language"`
+	GameName                    string   `json:"game_name"`
+	GameID                      string   `json:"game_id"`
+	Title                       string   `json:"title"`
+	Delay                       uint     `json:"delay"`
+	Tags                        []string `json:"tags"`
+	ContentClassificationLabels []string `json:"content_classification_labels"`
+	IsBrandedContent            bool     `json:"is_branded_content"`
+}
+
 type Subscription struct {
 	ID        string                `json:"id"`
 	Type      string                `json:"type"`
@@ -135,6 +154,34 @@ func GetEventSubscriptions() (*GetSubscriptionsResponse, error) {
 		return nil, fmt.Errorf("error getting app token: %w", err)
 	}
 	return getEventSubscriptions(authResp, false)
+}
+
+func GetChannelInformation() (*GetChannelInformationResponse, error) {
+	userId := os.Getenv("TWITCH_SENSAI_USER_ID")
+	var getChannelInfoResp GetChannelInformationResponse
+	token, err := authenticateToTwitch()
+	if err != nil {
+		return nil, fmt.Errorf("error authenticating to Twitch to get channel information: %w", err)
+	}
+	httpClient := http.DefaultClient
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s?broadcaster_id=%s", twitchGetChannelInfoURL, userId), nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request for getting channel information: %w", err)
+	}
+	req.Header.Add("Client-Id", os.Getenv("TWITCH_CLIENT_ID"))
+	req.Header.Add("Authorization", fmt.Sprint("Bearer ", token))
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error sending http request to get channel information: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status code from response was not OK: %s", resp.Status)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&getChannelInfoResp); err != nil {
+		return nil, fmt.Errorf("could not decode response body from get channel info response: %w", err)
+	}
+	return &getChannelInfoResp, nil
 }
 
 func authenticateToTwitch() (string, error) {
